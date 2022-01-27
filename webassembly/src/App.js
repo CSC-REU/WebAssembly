@@ -1,23 +1,32 @@
-import logo from './logo.svg';
+import { useEffect, useState, useRef } from 'react';
+import Editor from "@monaco-editor/react";
+
+import { loadPyodide } from 'pyodide/pyodide'
+
 import './App.css';
 
 function App() {
+  const editorRef = useRef(null);
+  const outputRef = useRef(null);
+  const [pyodide, setPyodide] = useState();
+
+  const [defaultValue] = useState(
+    `import micropip
+await micropip.install("cowsay")
+import cowsay
+cowsay.cow('hello world')`);
+
   useEffect(() => {
     const pyonideLoadingMessage = 'Python initialization complete';
-    if (!pyodide && props.local) {
-      // console.log('loading pyodide...');
-      globalThis.loadPyodide({
-        indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.18.1/full/',
+    if (!pyodide) {
+      loadPyodide({
+        indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.19.0/full/',
         stdout: (text) => {
-          if (!text.includes(pyonideLoadingMessage)) {
-            console.log('setting output to true...');
-            if (!output) setOutput(true);
-            return (document.getElementById('output').textContent += text + '\n')
-          }
+          // if (!text.includes(pyonideLoadingMessage))
+          outputRef.current.innerHTML += text + '\n'
         },
         stderr: (text) => {
-          if (!output) setOutput(true);
-          return (document.getElementById('output').textContent += text + '\n')
+          outputRef.current.innerHTML += text + '\n'
         }
       }).then(async p => {
         await p.loadPackage("micropip");
@@ -26,39 +35,66 @@ function App() {
         console.log('pyodide error:', err);
       });
     }
-
-  }, [monaco])
+  }, [])
 
   async function runLocalPython(e) {
-    if (document.getElementById('output')) document.getElementById('output').textContent = '';
+    outputRef.current.innerHTML = ''
     if (pyodide) {
       try {
         const value = editorRef.current.getValue();
         await pyodide.runPythonAsync(value);
-
       } catch (error) {
         console.log(error);
       }
-
     }
   }
 
+  function handleEditorDidMount(editor) {
+    editorRef.current = editor;
+  }
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div className="App" style={{ height: '100%' }}>
+      <script src="https://cdn.jsdelivr.net/pyodide/v0.18.1/full/pyodide.js"></script>
+      <Editor
+        height={'400px'}
+        width="100%"
+        // defaultLanguage={language.name}
+        language={'python'}
+        defaultValue={defaultValue}
+        // beforeMount={handleEditorWillMount}
+        // onValidate={handleEditorValidation}
+        // onChange={handleEditorChange}
+        onMount={handleEditorDidMount}
+        options={{
+          // renderLineHighlightOnlyWhenFocus:true,
+          // useShadowDOM:false,
+          minimap: { enabled: false },
+          padding: { bottom: "5px", top: "5px" },
+          scrollBeyondLastLine: false,
+          // overviewRulerLanes: 0,
+          // fixedOverflowWidgets: true,
+          automaticLayout: true,
+          quickSuggestions: { other: true, comments: true, strings: true }
+        }}
+      />
+      <div style={{ position: 'relative', height: '100%' }}>
+        <div style={{ position: 'absolute', top: 10, right: 10 }} onClick={runLocalPython}>▶️</div>
+        <pre
+          style={{
+            backgroundColor: '#222222',
+            width: '100%',
+            height: '100%',
+            whiteSpace: 'pre',
+            fontFamily: 'monospace',
+            textAlign: 'left',
+            padding: '5px',
+            color: 'lightgray',
+            overflow: 'auto'
+          }}>
+          <code ref={outputRef} />
+        </pre>
+      </div>
     </div>
   );
 }
